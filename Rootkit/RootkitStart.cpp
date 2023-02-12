@@ -12,7 +12,7 @@ int _tmain(int argc, _TCHAR* argv[])
     ZeroMemory(&pi, sizeof(pi));
 
     // The name of the executable you want to start
-    LPCTSTR lpApplicationName = _T("C:\\Windows\\System32\\notepad.exe");
+    LPCTSTR lpApplicationName = _T(".\\injectDLL.exe");
 
     // Start the child process.
     if (!CreateProcess(lpApplicationName,   // No module name (use command line)
