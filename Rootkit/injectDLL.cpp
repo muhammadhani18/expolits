@@ -31,9 +31,9 @@ HANDLE WINAPI MyCreateFileW(
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
 {
-    switch (ul_reason_for_call)
+    switch (ul_reason_for_call) //entry point for dll files when the system terminates or loads new process or thread
     {
-    case DLL_PROCESS_ATTACH:
+    case DLL_PROCESS_ATTACH: //dll loaded to the virtual address space
         OriginalCreateFileW = (CREATEFILEW)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "CreateFileW");
         if (OriginalCreateFileW)
         {
@@ -45,7 +45,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
             VirtualProtect(OriginalCreateFileW, sizeof(pMyCreateFileW), oldProtect, &oldProtect);
         }
         break;
-    case DLL_PROCESS_DETACH:
+    case DLL_PROCESS_DETACH: //could not load the dll into virtual space
         break;
     }
     return true;
